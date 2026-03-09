@@ -1,21 +1,71 @@
 import axios from 'axios';
 
+// Reddit OAuth credentials (will come from environment variables)
+let accessToken = null;
+let tokenExpiry = 0;
+
 /**
- * Fetches recent posts from a subreddit using public JSON endpoint
+ * Gets Reddit OAuth access token
+ * @param {string} clientId - Reddit app client ID
+ * @param {string} clientSecret - Reddit app client secret
+ * @returns {Promise<string>} Access token
+ */
+async function getAccessToken(clientId, clientSecret) {
+  // Check if we have a valid token already
+  if (accessToken && Date.now() < tokenExpiry) {
+    return accessToken;
+  }
+
+  try {
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    
+    const response = await axios.post(
+      'https://www.reddit.com/api/v1/access_token',
+      'grant_type=client_credentials',
+      {
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'ManifestationResearch/1.0 by Still-Jeweler-4097'
+        }
+      }
+    );
+
+    accessToken = response.data.access_token;
+    // Token expires in 1 hour, refresh 5 minutes early
+    tokenExpiry = Date.now() + (55 * 60 * 1000);
+    
+    console.log('✅ Reddit OAuth token obtained');
+    return accessToken;
+
+  } catch (error) {
+    console.error('❌ Failed to get Reddit access token:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetches recent posts from a subreddit using official Reddit API
  * @param {string} subreddit - Subreddit name (e.g., 'lawofattraction')
- * @param {number} limit - Number of posts to fetch (max 25)
+ * @param {number} limit - Number of posts to fetch (max 100)
+ * @param {string} clientId - Reddit client ID
+ * @param {string} clientSecret - Reddit client secret
  * @returns {Promise<Array>} Array of post objects
  */
-export async function scanSubreddit(subreddit, limit = 20) {
+export async function scanSubreddit(subreddit, limit = 20, clientId, clientSecret) {
   try {
-    const url = `https://www.reddit.com/r/${subreddit}/new/.json?limit=${limit}`;
+    // Get access token
+    const token = await getAccessToken(clientId, clientSecret);
     
-    // Add delay to avoid rate limiting
+    const url = `https://oauth.reddit.com/r/${subreddit}/new?limit=${limit}`;
+    
+    // Add delay to respect rate limits
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     const response = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': 'ManifestationResearch/1.0 by Still-Jeweler-4097'
       }
     });
 
@@ -33,7 +83,8 @@ export async function scanSubreddit(subreddit, limit = 20) {
         numComments: data.num_comments,
         createdUtc: data.created_utc,
         flair: data.link_flair_text || '',
-        postAge: getPostAge(data.created_utc)
+        postAge: getPostAge(data.created_utc),
+        upvoteRatio: data.upvote_ratio || 0
       };
     });
 
@@ -41,7 +92,7 @@ export async function scanSubreddit(subreddit, limit = 20) {
     return posts;
     
   } catch (error) {
-    console.error(`❌ Error scanning r/${subreddit}:`, error.message);
+    console.error(`❌ Error scanning r/${subreddit}:`, error.response?.data || error.message);
     return [];
   }
 }
@@ -72,15 +123,17 @@ function getPostAge(createdUtc) {
  * Scans multiple subreddits
  * @param {Array<string>} subreddits - Array of subreddit names
  * @param {number} postsPerSubreddit - Posts to fetch per subreddit
+ * @param {string} clientId - Reddit client ID
+ * @param {string} clientSecret - Reddit client secret
  * @returns {Promise<Array>} Combined array of all posts
  */
-export async function scanMultipleSubreddits(subreddits, postsPerSubreddit = 20) {
-  console.log(`\n🔍 Scanning ${subreddits.length} subreddits...`);
+export async function scanMultipleSubreddits(subreddits, postsPerSubreddit = 20, clientId, clientSecret) {
+  console.log(`\n🔍 Scanning ${subreddits.length} subreddits with Reddit API...`);
   
   const allPosts = [];
   
   for (const subreddit of subreddits) {
-    const posts = await scanSubreddit(subreddit, postsPerSubreddit);
+    const posts = await scanSubreddit(subreddit, postsPerSubreddit, clientId, clientSecret);
     allPosts.push(...posts);
   }
   
