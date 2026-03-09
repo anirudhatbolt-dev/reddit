@@ -1,0 +1,20 @@
+{
+  "name": "reddit-manifestation-scanner",
+  "version": "1.0.0",
+  "description": "Scans manifestation subreddits and drafts comments using Claude AI",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node src/index.js"
+  },
+  "keywords": ["reddit", "claude", "manifestation"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "google-spreadsheet": "^4.1.2"
+  }
+}
