@@ -18,17 +18,22 @@ async function main() {
   
   // Validate environment variables
   if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('❌ Missing ANTHROPIC_API_KEY in .env file');
+    console.error('❌ Missing ANTHROPIC_API_KEY in environment');
     process.exit(1);
   }
   
   if (!process.env.GOOGLE_SHEET_ID) {
-    console.error('❌ Missing GOOGLE_SHEET_ID in .env file');
+    console.error('❌ Missing GOOGLE_SHEET_ID in environment');
     process.exit(1);
   }
   
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    console.error('❌ Missing GOOGLE_SERVICE_ACCOUNT_JSON in .env file');
+    console.error('❌ Missing GOOGLE_SERVICE_ACCOUNT_JSON in environment');
+    process.exit(1);
+  }
+
+  if (!process.env.REDDIT_CLIENT_ID || !process.env.REDDIT_CLIENT_SECRET) {
+    console.error('❌ Missing REDDIT_CLIENT_ID or REDDIT_CLIENT_SECRET in environment');
     process.exit(1);
   }
 
@@ -36,8 +41,13 @@ async function main() {
     // Parse Google service account credentials
     const serviceAccountCreds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
     
-    // Step 1: Scan Reddit
-    const posts = await scanMultipleSubreddits(TARGET_SUBREDDITS, POSTS_PER_SUBREDDIT);
+    // Step 1: Scan Reddit using OAuth
+    const posts = await scanMultipleSubreddits(
+      TARGET_SUBREDDITS, 
+      POSTS_PER_SUBREDDIT,
+      process.env.REDDIT_CLIENT_ID,
+      process.env.REDDIT_CLIENT_SECRET
+    );
     
     if (posts.length === 0) {
       console.log('⚠️  No posts found. Exiting.');
@@ -67,6 +77,7 @@ async function main() {
     
   } catch (error) {
     console.error('❌ Fatal error:', error.message);
+    console.error(error);
     process.exit(1);
   }
 }
